@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Chistes Studio</title>
+<meta name="description" content="Crea imágenes y videos de chistes para tus páginas: biblioteca, editor con hablantes, formatos para Reels y exportación.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#panels">Saltar al contenido</a>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true">😄</span><h1>Chistes Studio</h1></div>
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button role="tab" id="tab-library" aria-controls="panel-library" aria-selected="true"><span class="ic" aria-hidden="true">📚</span><span>Biblioteca</span></button>
+    <button role="tab" id="tab-image" aria-controls="panel-image" aria-selected="false" tabindex="-1"><span class="ic" aria-hidden="true">🖼️</span><span>Imagen</span></button>
+    <button role="tab" id="tab-video" aria-controls="panel-video" aria-selected="false" tabindex="-1"><span class="ic" aria-hidden="true">🎬</span><span>Video</span></button>
+    <button role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1"><span class="ic" aria-hidden="true">🎨</span><span>Páginas</span></button>
+    <button role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1"><span class="ic" aria-hidden="true">💾</span><span>Archivo</span></button>
+  </nav>
+  <span id="fileBadge" class="chip" role="status" aria-live="polite">Archivo: sin vincular</span>
+</header>
+
+<main id="panels">
+  <!-- BIBLIOTECA -->
+  <section role="tabpanel" id="panel-library" aria-labelledby="tab-library" class="panel">
+    <div class="panel-head">
+      <h2>Biblioteca <small id="libCount"></small></h2>
+      <div class="row">
+        <button id="btnNewJoke" type="button">+ Nuevo chiste</button>
+        <button id="btnImport" type="button" class="ghost">Importar</button>
+        <button id="btnExport" type="button" class="ghost">Exportar copia</button>
+        <input id="fileImport" type="file" accept=".json,.csv,.txt" hidden>
+      </div>
+    </div>
+    <details class="filt" id="filtDet" open><summary>Filtros y búsqueda</summary>
+    <div class="filters">
+      <label>Buscar <input id="fSearch" type="search" placeholder="texto o etiqueta"></label>
+      <label>Orden
+        <select id="fSort">
+          <option value="new">Más recientes</option>
+          <option value="score">Mejor valorados (tu puntuación 1–5)</option>
+          <option value="alpha">A–Z</option>
+        </select>
+      </label>
+      <label>Idioma
+        <select id="fLang"><option value="es">Español (si hay traducción)</option><option value="en">Original</option></select>
+      </label>
+      <label>Página <select id="fPage"><option value="">Todas</option></select></label>
+      <label>Revisión
+        <select id="fReview">
+          <option value="">Todas</option>
+          <option value="ok">Sin alertas</option>
+          <option value="warn">Revisar</option>
+          <option value="bad">Cambiar</option>
+        </select>
+      </label>
+      <label>Uso
+        <select id="fUsage">
+          <option value="">Todos</option>
+          <option value="unused">Sin exportar</option>
+          <option value="used">Ya exportados</option>
+        </select>
+      </label>
+    </div></details>
+    <ul id="jokeList" class="jokes" aria-live="polite"></ul>
+  </section>
+
+  <!-- IMAGEN -->
+  <section role="tabpanel" id="panel-image" aria-labelledby="tab-image" class="panel" hidden>
+    <div class="split">
+      <div class="col">
+        <div id="slotImg"></div>
+        <div class="card">
+          <h3>Formato</h3>
+          <label>Tamaño
+            <select id="fmt">
+              <option value="1080x1440">Reels / vertical 3:4 (1080×1440)</option>
+              <option value="1080x1350">Vertical 4:5 (1080×1350)</option>
+              <option value="1080x1080">Cuadrado (1080×1080)</option>
+              <option value="940x788">Horizontal (940×788)</option>
+            </select>
+          </label>
+          <label>Página <select id="edPage"></select></label>
+          <label class="check"><input id="splitDialog" type="checkbox" checked> Separar diálogos en líneas</label>
+          <label class="check"><input id="capsTwist" type="checkbox" checked> Remate (última línea) en mayúsculas</label>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card sticky">
+          <div class="stage"><canvas id="canvas" width="1080" height="1440" aria-label="Vista previa de la imagen"></canvas></div>
+          <p class="muted">Logo: arrástralo en la vista previa (en el móvil activa «Mover logo»), o usa las flechas con la vista enfocada. Ajuste fino en Páginas.</p>
+          <button type="button" class="ghost moveLogo" data-target="canvas" aria-pressed="false">Mover logo</button>
+          <div class="row">
+            <button id="btnPng" type="button">Descargar PNG</button>
+            <button id="btnCopy" type="button" class="ghost">Copiar</button>
+            <button id="btnShare" type="button" class="ghost">Compartir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIDEO -->
+  <section role="tabpanel" id="panel-video" aria-labelledby="tab-video" class="panel" hidden>
+    <div class="split">
+      <div class="col">
+        <div id="slotVid"></div>
+        <div class="card">
+          <h3>Ajustes del video</h3>
+          <div class="grid2">
+            <label>Formato
+              <select id="vFmt">
+                <option value="1080x1920">Reels / Stories 9:16</option>
+                <option value="1080x1440">Vertical 3:4</option>
+                <option value="1080x1080">Cuadrado 1:1</option>
+              </select>
+            </label>
+            <label>Animación
+              <select id="vAnim">
+                <option value="fade">Aparecer por línea</option>
+                <option value="type">Máquina de escribir</option>
+                <option value="all">Todo a la vez</option>
+              </select>
+            </label>
+            <label>Duración: <output id="vDurOut">30 s</output>
+              <input id="vDur" type="range" min="5" max="30" step="1" value="15" disabled>
+            </label>
+            <label>Fondo
+              <select id="vBg">
+                <option value="color">Color de la página</option>
+                <option value="image">Imagen</option>
+                <option value="video">Video</option>
+              </select>
+            </label>
+          </div>
+          <label class="check"><input id="vAutoDur" type="checkbox" checked> Duración automática según el texto (máx. 30 s)</label>
+          <label id="vBgFileRow" hidden>Archivo de fondo <input id="vBgFile" type="file" accept="image/*,video/*"></label>
+          <label>Audio (voz en off o música) <input id="vAudio" type="file" accept="audio/*"></label>
+          <label>Volumen <input id="vVol" type="range" min="0" max="1" step="0.05" value="1"></label>
+          <label class="check"><input id="vProgress" type="checkbox" checked> Barra de progreso</label>
+          <label class="check"><input id="vDim" type="checkbox" checked> Oscurecer fondo para legibilidad</label>
+        </div>
+        <div class="card">
+          <div class="panel-head"><h3>Línea de tiempo</h3><button id="vAuto" type="button" class="ghost">Distribuir automático</button></div>
+          <p class="muted">Cuándo aparece cada línea (segundos). Se reparte según la longitud del texto; edítalo si lo necesitas.</p>
+          <ol id="vTimes" class="times"></ol>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card sticky">
+          <div class="stage phone"><canvas id="vcanvas" width="1080" height="1920" aria-label="Vista previa del video"></canvas></div>
+          <div class="row"><button type="button" class="ghost moveLogo" data-target="vcanvas" aria-pressed="false">Mover logo</button></div>
+          <div class="player">
+            <button id="vPlay" type="button" aria-label="Reproducir">▶</button>
+            <input id="vScrub" type="range" min="0" max="1000" value="0" aria-label="Posición del video">
+            <output id="vTime">0:00 / 0:30</output>
+          </div>
+          <div class="row">
+            <button id="vExport" type="button">Exportar video</button>
+            <button id="vCancel" type="button" class="danger" hidden>Cancelar</button>
+          </div>
+          <p id="vMsg" class="muted" role="status"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PÁGINAS -->
+  <section role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" class="panel" hidden>
+    <div class="panel-head">
+      <h2>Mis páginas</h2>
+      <div class="row">
+        <label class="inline">Página <select id="pgSelect"></select></label>
+        <button id="btnPgNew" type="button" class="ghost">+ Nueva</button>
+        <button id="btnPgReset" type="button" class="ghost">Restaurar valores</button>
+        <button id="btnPgDel" type="button" class="danger">Eliminar</button>
+      </div>
+    </div>
+    <div class="split">
+      <div class="col">
+        <div class="card">
+      <div class="grid3">
+        <label>Nombre <input id="pgName" type="text"></label>
+        <label>Marca de agua <input id="pgMark" type="text" placeholder="@mipagina"></label>
+        <label>Logo <input id="pgLogo" type="file" accept="image/*"></label>
+        <label>Fondo <input id="pgBg" type="color"></label>
+        <label>Texto <input id="pgFg" type="color"></label>
+        <label>Acento (remate) <input id="pgAccent" type="color"></label>
+      </div>
+      <label class="check"><input id="pgLogoClear" type="checkbox"> Quitar logo</label>
+      <p id="contrastInfo" class="muted" role="status"></p>
+      <h3>Posición del logo</h3>
+      <div class="grid3">
+        <label>X <input id="logoX" type="range" min="0" max="100" step="1"></label>
+        <label>Y <input id="logoY" type="range" min="0" max="100" step="1"></label>
+        <label>Tamaño <input id="logoS" type="range" min="4" max="40" step="1"></label>
+      </div>
+    </div>
+      </div>
+      <div class="col">
+        <div class="card sticky">
+          <h3>Vista previa</h3>
+          <div class="stage"><canvas id="pcanvas" width="1080" height="1440" aria-label="Vista previa de la página"></canvas></div>
+          <p class="muted">Usa el chiste actual (o un texto de muestra). Arrastra el logo aquí (en el móvil activa «Mover logo»).</p>
+          <button type="button" class="ghost moveLogo" data-target="pcanvas" aria-pressed="false">Mover logo</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHIVO -->
+  <section role="tabpanel" id="panel-file" aria-labelledby="tab-file" class="panel" hidden>
+    <div class="panel-head"><h2>Archivo de chistes</h2></div>
+    <div class="card">
+      <p class="muted">Los chistes viven en <code>data/jokes.json</code>, sin base de datos. En Chrome/Edge puedes vincular el archivo y guardar directo (Ctrl+S); en otros navegadores usa Importar/Exportar. Una copia local evita perder cambios entre sesiones.</p>
+      <div class="row">
+        <button id="btnFileLink" type="button">Vincular archivo</button>
+        <button id="btnFileSave" type="button" class="ghost">Guardar en archivo</button>
+        <button id="btnReload" type="button" class="ghost">Recargar data/jokes.json</button>
+      </div>
+      <p id="fileMsg" class="muted" role="status"></p>
+    </div>
+  </section>
+
+  <!-- Composer compartido por Imagen y Video -->
+  <div id="composer" class="card">
+    <h3>Chiste</h3>
+    <label for="jokeText">Una línea por frase. Usa <code>Nombre: texto</code> o <code>- texto</code> para diálogos.</label>
+    <textarea id="jokeText" rows="7" spellcheck="true" maxlength="1200"></textarea>
+    <div class="row between">
+      <span id="counter" class="muted"></span>
+      <span id="reviewBadge" class="chip" role="status"></span>
+    </div>
+    <ul id="reviewNotes" class="notes"></ul>
+    <div class="row">
+      <button id="btnSaveJoke" type="button">Guardar en biblioteca</button>
+      <button id="btnExample" type="button" class="ghost">Ejemplo</button>
+      <button id="btnLang" type="button" class="ghost">Original ⇄ Español</button>
+      <button id="btnClear" type="button" class="danger">Borrar</button>
+    </div>
+    <h3>Hablantes</h3>
+    <div id="speakers" class="speakers"></div>
+  </div>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<dialog id="dlg"><form method="dialog"><p id="dlgMsg"></p><div class="row"><button value="cancel" class="ghost">Cancelar</button><button value="ok" id="dlgOk">Aceptar</button></div></form></dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
