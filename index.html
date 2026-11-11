@@ -97,6 +97,13 @@
       <div class="col">
         <div class="card sticky">
           <div class="stage"><canvas id="canvas" width="1080" height="1440" aria-label="Vista previa de la imagen"></canvas></div>
+          <div id="slotCtlImg"><div id="textCtl" class="textctl">
+            <label>Tamaño del texto: <output id="tsOut">100 %</output>
+              <input id="tScale" type="range" min="60" max="200" step="5" value="100">
+            </label>
+            <div class="row"><button id="tsMax" type="button" class="ghost">Máximo permitido</button><button id="tsReset" type="button" class="ghost">100 %</button><label class="check"><input id="tCenter" type="checkbox" checked> Centrar</label></div>
+            <p id="tsNote" class="muted" role="status"></p>
+          </div></div>
           <p class="muted">Logo: arrástralo en la vista previa (en el móvil activa «Mover logo»), o usa las flechas con la vista enfocada. Ajuste fino en Páginas.</p>
           <button type="button" class="ghost moveLogo" data-target="canvas" aria-pressed="false">Mover logo</button>
           <div class="row">
@@ -146,6 +153,12 @@
                 <option value="video">Video</option>
               </select>
             </label>
+            <label>Zona segura (9:16)
+              <select id="safeMode">
+                <option value="strict">Estricta: 14 % arriba · 35 % abajo · 6 % lados</option>
+                <option value="reduced">Reducida: 14 % arriba · 20 % abajo · 6 % lados</option>
+              </select>
+            </label>
           </div>
           <label class="check"><input id="vAutoDur" type="checkbox" checked> Duración automática según el texto (máx. 30 s)</label>
           <div id="vBgBox" class="bgbox">
@@ -153,6 +166,8 @@
               <input id="vBgFile" type="file" accept="video/*,image/*">
             </label>
             <div class="row"><span id="vBgInfo" class="muted">Sin fondo cargado. El texto se dibuja encima del fondo que subas.</span><button id="vBgClear" type="button" class="ghost" hidden>Quitar fondo</button></div>
+            <progress id="vBgProg" max="100" hidden aria-label="Progreso de carga del fondo"></progress>
+            <div class="row"><span id="vBgPct" class="muted" role="status" hidden></span><button id="vBgCancel" type="button" class="ghost" hidden>Cancelar</button><button id="vBgOpt" type="button" class="ghost" hidden>Bajar calidad (más fluido)</button></div>
             <label>Intensidad del oscurecido: <output id="vDimOut">45 %</output>
               <input id="vDimAmt" type="range" min="0" max="80" step="5" value="45">
             </label>
@@ -171,6 +186,7 @@
       <div class="col">
         <div class="card sticky">
           <div class="stage phone"><canvas id="vcanvas" width="1080" height="1920" aria-label="Vista previa del video"></canvas></div>
+          <div id="slotCtlVid"></div>
           <div class="row"><button type="button" class="ghost moveLogo" data-target="vcanvas" aria-pressed="false">Mover logo</button></div>
           <div class="player">
             <button id="vPlay" type="button" aria-label="Reproducir">▶</button>
@@ -267,6 +283,7 @@
     </div>
     <h3>Hablantes</h3>
     <div id="speakers" class="speakers"></div>
+    
   </div>
 </main>
 

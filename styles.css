@@ -154,3 +154,10 @@ textarea,.notes,.times span{overflow-wrap:anywhere}
 
 .bgbox{border:2px dashed var(--line);border-radius:12px;padding:12px;margin:10px 0}
 .muted a{color:var(--accent)}
+
+progress{width:100%;height:14px;accent-color:var(--accent)}
+
+.textctl{border-top:1px solid var(--line);margin-top:10px;padding-top:6px}
+.textctl .row{margin:4px 0}
+.textctl label{margin:4px 0}
+.textctl .muted{margin:2px 0 0}

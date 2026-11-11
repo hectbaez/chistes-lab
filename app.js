@@ -82,6 +82,7 @@ function wrap(ctx, text, maxW) {
 const SAMPLE = ['Hijo: Papá, ¿qué es la crisis?', 'Papá: Cuando te piden el cambio.', 'Hijo: ¿Y eso es grave?', 'Papá: NO, PERO NO HAY CAMBIO.'].join(String.fromCharCode(10));
 const items = (sample = false) => parseLines(sample && !$('jokeText').value.trim() ? SAMPLE : $('jokeText').value, $('splitDialog').checked);
 // o: { t (seg|null), starts[], anim, bgDraw(ctx,w,h), light, progress (0..1) }
+const fitCache = new Map();
 function drawJoke(cv, w, h, o = {}) {
   if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h;
   const ctx = cv.getContext('2d'); const pg = page(ui.pageId);
@@ -90,8 +91,8 @@ function drawJoke(cv, w, h, o = {}) {
   const fg = o.light ? '#ffffff' : pg.fg;
   const list = items(o.sample);
   const keys = speakerKeys(list); const dark = !!o.light || isDarkBg(pg.bg);
-  const pad = w * 0.09; const maxW = w - pad * 2; const family = 'system-ui, "Segoe UI", sans-serif';
-  let size = Math.round(w * 0.075); let blocks;
+  const safe = o.safe || null; const center = $('tCenter').checked; const pad = w * (safe ? safe.side : 0.09); const maxW = w - pad * 2; const family = 'system-ui, "Segoe UI", sans-serif';
+  const tscale = (+$('tScale').value || 100) / 100; const base = Math.round(w * 0.075 * tscale); let size = base; let blocks;
   const layout = () => {
     ctx.font = `700 ${size}px ${family}`;
     blocks = list.map((it, i) => {
@@ -99,12 +100,15 @@ function drawJoke(cv, w, h, o = {}) {
       const txt = (it.speaker ? it.speaker + ': ' : it.dash ? '— ' : '') + (last && $('capsTwist').checked ? it.text.toUpperCase() : it.text);
       return { it, last, txt, lines: wrap(ctx, txt, maxW - (it.dash ? w * 0.05 : 0)) };
     });
+    if (size > 22 && blocks.some((b) => b.lines.some((l) => ctx.measureText(l).width > maxW + 1))) return Infinity;
     return blocks.reduce((a, b) => a + b.lines.length, 0) * size * 1.25 + (blocks.length - 1) * size * 0.5;
   };
   // Zona segura (Reels/Stories): deja libre la parte superior e inferior donde la app superpone sus controles.
-  const safe = o.safe || null; const avail = safe ? h * (1 - safe.top - safe.bottom - 0.05) : h * 0.7;
-  while (size > 22 && layout() > avail) size -= 2;
-  const total = layout(); let y = (safe ? h * safe.top + (avail - total) / 2 : (h - total) / 2) + size; const yTop = y - size; ctx.textBaseline = 'alphabetic';
+  const avail = safe ? h * (1 - safe.top - safe.bottom - 0.05) : h * 0.84;
+  const fitKey = [w, h, tscale, safe ? safe.bottom : 0, $('capsTwist').checked, list.map((l) => (l.speaker || (l.dash ? '-' : '')) + l.text).join(String.fromCharCode(1))].join('|');
+  const cached = fitCache.get(fitKey);
+  if (cached) size = cached; else { while (size > 22 && layout() > avail) size -= 2; fitCache.set(fitKey, size); if (fitCache.size > 300) fitCache.clear(); }
+  const total = layout(); const overflow = total > avail; let y = (safe ? h * safe.top + (avail - total) / 2 : (h - total) / 2) + size; const yTop = y - size; ctx.textBaseline = 'alphabetic';
   blocks.forEach((b, i) => {
     let p = 1;
     if (o.t != null && o.anim !== 'all') { const dur = o.anim === 'type' ? Math.max(0.6, Math.min(2.5, b.txt.length * 0.05)) : 0.5; p = Math.max(0, Math.min(1, (o.t - o.starts[i]) / dur)); }
@@ -113,19 +117,21 @@ function drawJoke(cv, w, h, o = {}) {
     let budget = o.anim === 'type' && o.t != null ? Math.floor(p * b.txt.length) : Infinity;
     ctx.globalAlpha = o.anim === 'type' || o.t == null ? 1 : p;
     const dy = o.anim === 'fade' && o.t != null ? (1 - p) * size * 0.4 : 0;
-    for (const l of b.lines) { if (budget > 0) ctx.fillText(budget >= l.length ? l : l.slice(0, budget), pad + (b.it.voice === 1 ? w * 0.05 : 0), y + dy); budget -= l.length + 1; y += size * 1.25; }
+    for (const l of b.lines) { const x0 = center ? (w - ctx.measureText(l).width) / 2 : pad + (b.it.voice === 1 ? w * 0.05 : 0); if (budget > 0) ctx.fillText(budget >= l.length ? l : l.slice(0, budget), x0, y + dy); budget -= l.length + 1; y += size * 1.25; }
     ctx.globalAlpha = 1; y += size * 0.5;
   });
-  cv._info = { top: yTop, bottom: y - size * 0.75, h };
+  cv._info = { top: yTop, bottom: y - size * 0.75, h, w, size, base, overflow };
   if (!list.length) { ctx.fillStyle = fg; ctx.globalAlpha = 0.4; ctx.font = `400 ${w * 0.05}px ${family}`; ctx.fillText('Escribe un chiste…', pad, h / 2); ctx.globalAlpha = 1; }
   if (pg.watermark) { ctx.font = `600 ${w * 0.035}px ${family}`; ctx.fillStyle = fg; ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.fillText(pg.watermark, w / 2, safe ? h * (1 - safe.bottom) - h * 0.012 : h - h * 0.04); ctx.textAlign = 'left'; ctx.globalAlpha = 1; }
   if (logoImg) {
     const lw = (pg.logoPos.size / 100) * w; const lh = (logoImg.height / logoImg.width) * lw;
-    ctx.drawImage(logoImg, (pg.logoPos.x / 100) * (w - lw), (pg.logoPos.y / 100) * (h - lh), lw, lh);
+    let lx = (pg.logoPos.x / 100) * (w - lw); let ly = (pg.logoPos.y / 100) * (h - lh);
+    if (safe) { lx = Math.min(Math.max(lx, w * safe.side), w * (1 - safe.side) - lw); ly = Math.min(Math.max(ly, h * safe.top), h * (1 - safe.bottom) - lh); }
+    ctx.drawImage(logoImg, lx, ly, lw, lh);
   }
   if (o.progress != null) { ctx.fillStyle = pg.accent; ctx.fillRect(0, h - h * 0.008, w * o.progress, h * 0.008); }
 }
-function render() { const { w, h } = dims(); drawJoke($('canvas'), w, h); renderPagePreview(); renderVideoFrame?.(); updatePolicy(); }
+function render() { const { w, h } = dims(); drawJoke($('canvas'), w, h); renderPagePreview(); renderVideoFrame?.(); updatePolicy(); updateTextNote(); }
 function renderPagePreview() { const p = $('panel-pages'); if (!p || p.hidden) return; drawJoke($('pcanvas'), 1080, 1440, { sample: true }); }
 function loadLogo() {
   const pg = page(ui.pageId); logoImg = null;
@@ -303,7 +309,9 @@ async function init() {
   $('btnNewJoke').onclick = () => { ui.jokeId = null; $('jokeText').value = ''; onText(); showTab('image'); $('jokeText').focus(); };
   $('btnExample').onclick = () => { $('jokeText').value = 'Pepe: Doctor, ¿qué tengo?\nDoctor: Mucha imaginación.\nPepe: ¿Y eso es grave?\nDoctor: NO, PERO NO ES REAL.'; ui.jokeId = null; onText(); };
   $('btnClear').onclick = async () => { const prev = $('jokeText').value; if (!prev) return; if (prev.length > 40 && !(await confirmDlg('¿Borrar el texto del editor?'))) return; $('jokeText').value = ''; onText(); toast('Texto borrado.', 'Deshacer', () => { $('jokeText').value = prev; onText(); }); };
-  $('btnSaveJoke').onclick = saveJoke; $('btnPng').onclick = downloadPng; $('btnCopy').onclick = copyImg; $('btnShare').onclick = shareImg;
+  $('btnSaveJoke').onclick = saveJoke;
+  const setScale = (v) => { $('tScale').value = v; $('tsOut').textContent = v + ' %'; render(); };
+  $('tScale').oninput = () => setScale($('tScale').value); $('tsMax').onclick = () => setScale(200); $('tsReset').onclick = () => setScale(100); $('tCenter').oninput = render; $('btnPng').onclick = downloadPng; $('btnCopy').onclick = copyImg; $('btnShare').onclick = shareImg;
   $('btnImport').onclick = () => $('fileImport').click(); $('fileImport').onchange = (e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; };
   $('btnExport').onclick = exportCopy; $('btnFileLink').onclick = linkFile; $('btnFileSave').onclick = saveToFile;
   $('btnReload').onclick = async () => { if (ui.dirty && !(await confirmDlg('Hay cambios sin guardar. ¿Reemplazarlos con data/jokes.json?'))) return; try { applyImported(await loadSeed(), 'replace'); ui.dirty = false; updateBadge(); toast('Recargado desde data/jokes.json.'); } catch (e) { toast('No se pudo recargar: ' + e.message); } };
@@ -317,8 +325,8 @@ function showTab(name, push = true) {
   try { if (push && !(history.state && history.state.tab === name)) history.pushState({ tab: name }, '', '#' + name); else if (!push) history.replaceState({ tab: name }, '', '#' + name); } catch { /* sin historial */ }
   for (const t of TABS) { const on = t === name; $('tab-' + t).setAttribute('aria-selected', on); $('tab-' + t).tabIndex = on ? 0 : -1; $('panel-' + t).hidden = !on; }
   const comp = $('composer'); comp.hidden = !(name === 'image' || name === 'video');
-  if (name === 'image') $('slotImg').append(comp);
-  if (name === 'video') $('slotVid').append(comp);
+  if (name === 'image') { $('slotImg').append(comp); $('slotCtlImg').append($('textCtl')); }
+  if (name === 'video') { $('slotVid').append(comp); $('slotCtlVid').append($('textCtl')); }
   if (name !== 'video') vStop();
   window.scrollTo(0, 0);
   try { localStorage.setItem('tab', name); } catch { /* sin almacenamiento */ }
@@ -380,11 +388,11 @@ function renderVideoFrame() {
   const mode = $('vBg').value; const vid = mode === 'video' && V.bgVid && V.bgVid.readyState >= 2 ? V.bgVid : null; const img = mode === 'image' ? V.bgImg : null;
   const media = !!(vid || img); const dim = media && $('vDim').checked;
   drawJoke($('vcanvas'), w, h, {
-    t, starts: V.starts, anim: $('vAnim').value, light: dim, safe: $('vFmt').value === '1080x1920' ? { top: 0.14, bottom: 0.2 } : null, progress: $('vProgress').checked ? t / D : null,
+    t, starts: V.starts, anim: $('vAnim').value, light: dim, safe: $('vFmt').value === '1080x1920' ? safeZone() : null, progress: $('vProgress').checked ? t / D : null,
     bgDraw: media ? (ctx) => { if (vid) cover(ctx, vid, vid.videoWidth, vid.videoHeight, w, h); else cover(ctx, img, img.naturalWidth, img.naturalHeight, w, h); if (dim) { ctx.fillStyle = 'rgba(0,0,0,' + (+$('vDimAmt').value / 100) + ')'; ctx.fillRect(0, 0, w, h); } } : null,
   });
   $('vScrub').value = Math.round((t / D) * 1000); $('vTime').textContent = `${fmtT(t)} / ${fmtT(D)}`;
-  if (!V.playing) updatePolicy();
+  updateTextNote(); if (!V.playing) updatePolicy();
 }
 function vStop() {
   V.playing = false; cancelAnimationFrame(V.raf); if (V.audioEl) V.audioEl.pause(); if (V.bgVid) V.bgVid.pause();
@@ -396,7 +404,7 @@ function vPlay(fromStart = false, onEnd = null) {
   V.playing = true; V.onEnd = onEnd; V.t0 = performance.now() - V.t * 1000;
   $('vPlay').textContent = '⏸'; $('vPlay').setAttribute('aria-label', 'Pausar');
   if (V.audioEl && !V.recording) { V.audioEl.currentTime = V.t; V.audioEl.volume = +$('vVol').value; V.audioEl.play().catch(() => {}); }
-  if (V.bgVid && $('vBg').value === 'video') { V.bgVid.currentTime = V.bgVid.duration ? V.t % V.bgVid.duration : 0; V.bgVid.play().catch(() => {}); }
+  if (V.bgVid && $('vBg').value === 'video') { bgSeek(V.t); V.bgVid.play().catch(() => {}); }
   const loop = () => {
     if (!V.playing) return;
     V.t = (performance.now() - V.t0) / 1000;
@@ -434,41 +442,123 @@ async function vExport() {
   } catch (e) { vMsg('Error al exportar: ' + e.message); }
   finally { if (actx) actx.close(); V.recording = false; $('vExport').disabled = false; $('vCancel').hidden = true; V.t = D; renderVideoFrame(); }
 }
+// ---------- Fondo de video: carga con progreso y optimización ----------
+let bgJob = 0; // se incrementa para invalidar cargas u optimizaciones en curso
+const MB = 1048576;
+const bgDur = () => (V.bgVid && (V.bgVid._dur || V.bgVid.duration)) || 0;
+function bgSeek(t) { if (!V.bgVid) return; const d = bgDur(); try { V.bgVid.currentTime = d && isFinite(d) ? t % d : 0; } catch { /* aún no listo */ } }
+function bgProgress(pct, label) {
+  const p = $('vBgProg'); const l = $('vBgPct');
+  if (pct == null && !label) { p.hidden = true; l.hidden = true; return; }
+  p.hidden = false; l.hidden = !label; l.textContent = label || '';
+  if (pct == null) p.removeAttribute('value'); else p.value = Math.max(0, Math.min(100, pct));
+}
+function bgIdle() { bgProgress(null, ''); $('vBgCancel').hidden = true; }
+function bgButtons(loaded) { $('vBgClear').hidden = !V.bgUrl; $('vBgOpt').hidden = !(loaded && V.bgVid && !V.bgOptimized); }
+const needsOpt = (v, f) => f.size > 60 * MB || Math.max(v.videoWidth, v.videoHeight) > 1920 || v.duration > 45;
+
 function setBgFile(f) {
+  const job = ++bgJob;
   if (V.bgUrl) URL.revokeObjectURL(V.bgUrl);
-  V.bgImg = null; V.bgVid = null; V.bgUrl = null; vStop();
-  const info = $('vBgInfo'); const clr = $('vBgClear');
-  if (!f) { info.textContent = 'Sin fondo cargado. El texto se dibuja encima del fondo que subas.'; clr.hidden = true; renderVideoFrame(); return; }
-  const size = (f.size / 1048576).toFixed(1) + ' MB';
-  if (f.size > 300 * 1048576) { info.textContent = 'El archivo pesa ' + size + '; usa uno de menos de 300 MB.'; clr.hidden = false; renderVideoFrame(); return; }
-  V.bgUrl = URL.createObjectURL(f); clr.hidden = false; info.textContent = 'Cargando ' + f.name + '…';
+  if (V.bgVid) { try { V.bgVid.pause(); } catch { /* nada */ } }
+  V.bgImg = null; V.bgVid = null; V.bgUrl = null; V.bgFile = null; V.bgOptimized = false; vStop(); bgIdle();
+  const info = $('vBgInfo');
+  if (!f) { info.textContent = 'Sin fondo cargado. El texto se dibuja encima del fondo que subas.'; bgButtons(false); renderVideoFrame(); return; }
+  const size = (f.size / MB).toFixed(1) + ' MB';
+  if (f.size > 1024 * MB) { info.textContent = 'El archivo pesa ' + size + '; usa uno de menos de 1 GB.'; bgButtons(false); renderVideoFrame(); return; }
+  V.bgUrl = URL.createObjectURL(f); V.bgFile = f; bgButtons(false);
   const fail = () => {
-    V.bgVid = null; V.bgImg = null;
-    info.textContent = 'No se pudo leer «' + f.name + '». Prueba con un MP4 (H.264) o WebM; los videos HEVC/H.265 de algunos teléfonos no se pueden decodificar en todos los navegadores.';
+    if (job !== bgJob) return;
+    V.bgVid = null; V.bgImg = null; bgIdle();
+    info.textContent = 'No se pudo leer «' + f.name + '». Prueba con un MP4 (H.264) o WebM; los videos HEVC/H.265 de algunos teléfonos no se decodifican en todos los navegadores.';
     vMsg('No se pudo cargar el fondo.'); renderVideoFrame();
   };
-  if (f.type.startsWith('video/')) {
-    const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
-    v.onerror = fail;
-    v.onloadeddata = () => {
-      V.bgVid = v; $('vBg').value = 'video';
-      info.textContent = f.name + ' · ' + v.videoWidth + '×' + v.videoHeight + ' · ' + Math.round(v.duration) + ' s · ' + size + (v.duration < vDur() ? ' · se repite en bucle' : '');
-      vMsg('Fondo de video cargado: el texto se dibuja encima.'); renderVideoFrame();
-    };
-    v.onseeked = renderVideoFrame; v.src = V.bgUrl;
-  } else if (f.type.startsWith('image/')) {
+  if (f.type.startsWith('image/')) {
+    info.textContent = 'Cargando ' + f.name + '…'; bgProgress(null, 'Cargando imagen…');
     const im = new Image(); im.onerror = fail;
-    im.onload = () => { V.bgImg = im; $('vBg').value = 'image'; info.textContent = f.name + ' · ' + im.naturalWidth + '×' + im.naturalHeight + ' · ' + size; renderVideoFrame(); };
-    im.src = V.bgUrl;
-  } else fail();
+    im.onload = () => { if (job !== bgJob) return; V.bgImg = im; $('vBg').value = 'image'; bgIdle(); info.textContent = f.name + ' · ' + im.naturalWidth + '×' + im.naturalHeight + ' · ' + size; renderVideoFrame(); };
+    im.src = V.bgUrl; return;
+  }
+  if (!f.type.startsWith('video/')) { fail(); return; }
+  info.textContent = f.name + ' · ' + size; bgProgress(null, 'Leyendo el archivo…'); $('vBgCancel').hidden = false;
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
+  let ready = false;
+  const slow = setTimeout(() => {
+    if (job !== bgJob || ready) return;
+    info.textContent = 'Está tardando más de lo normal: el archivo es grande o su formato es pesado. Puedes esperar o cancelar y probar con un MP4 más ligero.';
+  }, 15000);
+  v.onloadedmetadata = () => { if (job === bgJob) info.textContent = f.name + ' · ' + v.videoWidth + '×' + v.videoHeight + ' · ' + Math.round(v.duration) + ' s · ' + size; };
+  v.onprogress = () => {
+    if (job !== bgJob || ready || !v.duration || !isFinite(v.duration) || !v.buffered.length) return;
+    const pct = Math.round(Math.min(99, (v.buffered.end(v.buffered.length - 1) / v.duration) * 100)); bgProgress(pct, 'Cargando… ' + pct + ' %');
+  };
+  v.onerror = () => { clearTimeout(slow); fail(); };
+  v.onloadeddata = () => {
+    ready = true; clearTimeout(slow); if (job !== bgJob) return;
+    V.bgVid = v; $('vBg').value = 'video'; bgIdle(); bgButtons(true);
+    info.textContent = f.name + ' · ' + v.videoWidth + '×' + v.videoHeight + ' · ' + Math.round(v.duration) + ' s · ' + size + (v.duration < vDur() ? ' · se repite en bucle' : '');
+    renderVideoFrame();
+    if (needsOpt(v, f)) { vMsg('El video es pesado: bajando la calidad para que la edición sea fluida…'); optimizeBg(v, f, job, false); }
+    else vMsg('Fondo de video cargado: el texto se dibuja encima.');
+  };
+  v.onseeked = renderVideoFrame; v.src = V.bgUrl; v.load();
 }
+
+// Re-codifica el fondo a 720p (máx. 30 s) en tiempo real. Mantén la pestaña visible mientras dura.
+async function optimizeBg(v, f, job, manual) {
+  const info = $('vBgInfo');
+  if (!window.MediaRecorder || !v || !v.videoWidth) { info.textContent += ' · Este navegador no permite bajar la calidad.'; return false; }
+  vStop();
+  const keep = Math.min(v.duration, 30); const sc = Math.min(1, 720 / Math.min(v.videoWidth, v.videoHeight));
+  const w = Math.max(2, Math.round((v.videoWidth * sc) / 2) * 2); const h = Math.max(2, Math.round((v.videoHeight * sc) / 2) * 2);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d');
+  const mime = ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m)) || '';
+  const rec = new MediaRecorder(cv.captureStream(30), mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : undefined);
+  const chunks = []; rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((r) => (rec.onstop = r));
+  $('vBgOpt').hidden = true; $('vBgCancel').hidden = false; bgProgress(0, 'Optimizando… 0 %');
+  const wasLoop = v.loop; v.loop = false; v.onseeked = null; v.pause();
+  await new Promise((r) => { v.onseeked = r; v.currentTime = 0; setTimeout(r, 1500); });
+  rec.start(250);
+  let aborted = false;
+  await new Promise((resolve) => {
+    const step = () => {
+      if (job !== bgJob) { aborted = true; return resolve(); }
+      cx.drawImage(v, 0, 0, w, h);
+      const pct = Math.round(Math.min(100, (v.currentTime / keep) * 100)); bgProgress(pct, 'Optimizando… ' + pct + ' %');
+      if (v.currentTime >= keep || v.ended) return resolve();
+      requestAnimationFrame(step);
+    };
+    v.play().then(() => requestAnimationFrame(step)).catch(() => { aborted = true; resolve(); });
+  });
+  v.pause(); if (rec.state !== 'inactive') rec.stop(); await stopped;
+  if (aborted || job !== bgJob) { if (job === bgJob) { v.loop = wasLoop; bgIdle(); bgButtons(true); } return false; }
+  const type = rec.mimeType || mime || 'video/webm'; const blob = new Blob(chunks, { type }); const url = URL.createObjectURL(blob);
+  const v2 = document.createElement('video'); v2.muted = true; v2.loop = true; v2.playsInline = true; v2.preload = 'auto'; v2._dur = keep;
+  const ok = await new Promise((res) => { v2.onloadeddata = () => res(true); v2.onerror = () => res(false); v2.src = url; setTimeout(() => res(false), 15000); });
+  if (job !== bgJob) { URL.revokeObjectURL(url); return false; }
+  if (!ok) { URL.revokeObjectURL(url); v.loop = wasLoop; bgIdle(); bgButtons(true); info.textContent += ' · No se pudo optimizar; se usa el original.'; return false; }
+  if (!isFinite(v2.duration)) { // WebM de MediaRecorder sin duración: se fuerza el cálculo
+    await new Promise((res) => { v2.ontimeupdate = () => { v2.ontimeupdate = null; res(); }; v2.currentTime = 1e101; setTimeout(res, 3000); });
+    v2.currentTime = 0;
+  }
+  const before = (f.size / MB).toFixed(1); const after = (blob.size / MB).toFixed(1);
+  URL.revokeObjectURL(V.bgUrl); V.bgUrl = url; V.bgVid = v2; V.bgOptimized = true; v2.onseeked = renderVideoFrame;
+  bgIdle(); bgButtons(true);
+  info.textContent = 'Optimizado: ' + w + '×' + h + ' · ' + Math.round(keep) + ' s · ' + after + ' MB (antes ' + before + ' MB)' + (keep < vDur() ? ' · se repite en bucle' : '');
+  vMsg('Fondo optimizado: la edición y la exportación irán más fluidas.');
+  renderVideoFrame(); return true;
+}
+
 function initVideo() {
   const rf = () => renderVideoFrame();
-  ['vFmt', 'vAnim', 'vProgress', 'vDim', 'splitDialog', 'capsTwist'].forEach((id) => $(id).addEventListener('input', rf));
+  ['vFmt', 'vAnim', 'vProgress', 'vDim', 'splitDialog', 'capsTwist', 'safeMode'].forEach((id) => $(id).addEventListener('input', rf));
   $('vAutoDur').onchange = () => { $('vDur').disabled = $('vAutoDur').checked; V.manual = false; V.key = ''; vStop(); renderVideoFrame(); };
   $('vDur').oninput = () => { $('vDurOut').textContent = vDur() + ' s'; V.manual = false; V.key = ''; vStop(); renderVideoFrame(); };
   $('vBg').onchange = rf;
   $('vBgClear').onclick = () => { $('vBgFile').value = ''; $('vBg').value = 'color'; setBgFile(null); };
+  $('vBgCancel').onclick = () => { $('vBgFile').value = ''; $('vBg').value = 'color'; setBgFile(null); };
+  $('vBgOpt').onclick = () => { if (V.bgVid && V.bgFile) optimizeBg(V.bgVid, V.bgFile, bgJob, true); };
   $('vDimAmt').oninput = () => { $('vDimOut').textContent = $('vDimAmt').value + ' %'; rf(); };
   $('vBgFile').onchange = (e) => setBgFile(e.target.files[0]);
   $('vAudio').onchange = (e) => {
@@ -477,7 +567,7 @@ function initVideo() {
     V.audioEl.onloadedmetadata = () => { const d = Math.min(30, Math.max(5, Math.ceil(V.audioEl.duration))); $('vAutoDur').checked = false; $('vDur').disabled = false; $('vDur').value = d; $('vDur').oninput(); vMsg(`Duración ajustada al audio: ${d} s.`); };
   };
   $('vVol').oninput = () => { if (V.audioEl) V.audioEl.volume = +$('vVol').value; };
-  $('vScrub').oninput = () => { vStop(); V.t = (+$('vScrub').value / 1000) * vDur(); if (V.bgVid) V.bgVid.currentTime = V.bgVid.duration ? V.t % V.bgVid.duration : 0; renderVideoFrame(); };
+  $('vScrub').oninput = () => { vStop(); V.t = (+$('vScrub').value / 1000) * vDur(); if (V.bgVid) bgSeek(V.t); renderVideoFrame(); };
   $('vPlay').onclick = () => vPlay();
   $('vAuto').onclick = () => { vAutoTimes(); vBuildTimes(); renderVideoFrame(); };
   $('vExport').onclick = vExport;
@@ -561,7 +651,9 @@ function policyFor(kind) {
   } else {
     const D = vDur(); const fmt = $('vFmt').value;
     if (D < 5) add('warn', 'Video muy corto', 'Meta recomienda evitar videos muy cortos que aporten poco valor.'); else add('ok', 'Duración adecuada', `${D} s.`);
-    if (fmt !== '1080x1920') add('warn', 'Formato no vertical 9:16', 'Para Reels y Stories Meta recomienda 1080×1920.'); else add('ok', 'Formato 9:16 (1080×1920)', 'Con zona segura aplicada arriba y abajo.');
+    if (fmt !== '1080x1920') add('warn', 'Formato no vertical 9:16', 'Para Reels y Stories Meta recomienda 1080×1920.'); else add('ok', 'Formato 9:16 (1080×1920)', 'Zona segura aplicada: ' + zoneText() + '.');
+    const vi = $('vcanvas')._info;
+    if (fmt === '1080x1920' && vi) { if (vi.overflow) add('warn', 'Texto largo para la zona segura', 'Ni con el tamaño mínimo cabe dentro de la zona segura: acorta el texto.'); else add('ok', 'Texto dentro de la zona segura', 'Se ajusta solo al mayor tamaño que cabe (' + Math.round((vi.size / (vi.w * 0.075)) * 100) + ' % del base) y queda centrado.'); }
     const moving = $('vAnim').value !== 'all' || (media && V.bgVid && $('vBg').value === 'video');
     if (!moving) add('warn', 'Video de imagen fija con texto', 'Meta no considera mejora significativa añadir bordes, subtítulos o cambiar la velocidad, y las políticas restringen los videos que son una imagen fija. Usa animación del texto o un video de fondo propio.');
     else add('ok', 'Tiene movimiento', $('vBg').value === 'video' && V.bgVid ? 'Texto animado sobre video de fondo.' : 'Texto animado línea a línea.');
@@ -574,6 +666,15 @@ function policyFor(kind) {
   items.sort((a, b) => ORDER[a.level] - ORDER[b.level]);
   const level = items.some((i) => i.level === 'bad') ? 'bad' : items.some((i) => i.level === 'warn') ? 'warn' : 'ok';
   return { level, items };
+}
+const safeZone = () => ($('safeMode').value === 'reduced' ? { top: 0.14, bottom: 0.2, side: 0.06 } : { top: 0.14, bottom: 0.35, side: 0.06 });
+const zoneText = () => { const z = safeZone(); return Math.round(z.top * 100) + ' % arriba · ' + Math.round(z.bottom * 100) + ' % abajo · ' + Math.round(z.side * 100) + ' % a los lados'; };
+function updateTextNote() {
+  const note = $('tsNote'); if (!note) return;
+  const vid = $('panel-video') && !$('panel-video').hidden; const cv = vid ? $('vcanvas') : $('canvas'); const i = cv._info; if (!i) return;
+  const eff = Math.round((i.size / (i.w * 0.075)) * 100); const want = +$('tScale').value;
+  const zone = vid && $('vFmt').value === '1080x1920' ? ' en la zona segura de Meta' : '';
+  note.textContent = eff < want ? 'Tamaño efectivo: ' + eff + ' % (limitado para que el texto quepa' + zone + ').' : 'Tamaño efectivo: ' + eff + ' %.';
 }
 let lastPolKey = '';
 function updatePolicy(force = false) {
