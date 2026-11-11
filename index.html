@@ -44,6 +44,8 @@
           <option value="new">Más recientes</option>
           <option value="score">Mejor valorados (tu puntuación 1–5)</option>
           <option value="alpha">A–Z</option>
+          <option value="short">Menos texto primero</option>
+          <option value="long">Más texto primero</option>
         </select>
       </label>
       <label>Idioma
@@ -57,6 +59,9 @@
           <option value="warn">Revisar</option>
           <option value="bad">Cambiar</option>
         </select>
+      </label>
+      <label>Monetización
+        <select id="fPolicy"><option value="">Todas</option><option value="ok">Apto</option><option value="warn">Revisar</option><option value="bad">Riesgo</option></select>
       </label>
       <label>Uso
         <select id="fUsage">
@@ -100,6 +105,11 @@
             <button id="btnShare" type="button" class="ghost">Compartir</button>
           </div>
         </div>
+        <div class="card">
+          <div class="panel-head"><h3>Validación para Facebook</h3><span id="polImgChip" class="chip"></span></div>
+          <ul id="polImg" class="pol"></ul>
+          <p class="muted">Basado en las políticas de monetización de Meta: contenido original, derechos de música y material, y calidad. No comprueba los requisitos del programa (seguidores, minutos de reproducción) ni garantiza la aprobación. Fuentes: <a href="https://www.facebook.com/business/help/169845596919485" target="_blank" rel="noopener">Políticas para socios</a> · <a href="https://www.facebook.com/legal/creator_content_monetization_terms" target="_blank" rel="noopener">Términos de contenido</a> · <a href="https://creators.facebook.com/blog/combating-unoriginal-content" target="_blank" rel="noopener">Contenido no original</a> · <a href="https://about.fb.com/news/2026/03/rewarding-original-creators-on-facebook/" target="_blank" rel="noopener">Creadores originales (2026)</a>.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -138,7 +148,15 @@
             </label>
           </div>
           <label class="check"><input id="vAutoDur" type="checkbox" checked> Duración automática según el texto (máx. 30 s)</label>
-          <label id="vBgFileRow" hidden>Archivo de fondo <input id="vBgFile" type="file" accept="image/*,video/*"></label>
+          <div id="vBgBox" class="bgbox">
+            <label>Subir video o imagen de fondo (el texto se dibuja encima)
+              <input id="vBgFile" type="file" accept="video/*,image/*">
+            </label>
+            <div class="row"><span id="vBgInfo" class="muted">Sin fondo cargado. El texto se dibuja encima del fondo que subas.</span><button id="vBgClear" type="button" class="ghost" hidden>Quitar fondo</button></div>
+            <label>Intensidad del oscurecido: <output id="vDimOut">45 %</output>
+              <input id="vDimAmt" type="range" min="0" max="80" step="5" value="45">
+            </label>
+          </div>
           <label>Audio (voz en off o música) <input id="vAudio" type="file" accept="audio/*"></label>
           <label>Volumen <input id="vVol" type="range" min="0" max="1" step="0.05" value="1"></label>
           <label class="check"><input id="vProgress" type="checkbox" checked> Barra de progreso</label>
@@ -164,6 +182,11 @@
             <button id="vCancel" type="button" class="danger" hidden>Cancelar</button>
           </div>
           <p id="vMsg" class="muted" role="status"></p>
+        </div>
+        <div class="card">
+          <div class="panel-head"><h3>Validación para Facebook</h3><span id="polVidChip" class="chip"></span></div>
+          <ul id="polVid" class="pol"></ul>
+          <p class="muted">Basado en las políticas de monetización de Meta: contenido original, derechos de música y material, y calidad. No comprueba los requisitos del programa (seguidores, minutos de reproducción) ni garantiza la aprobación. Fuentes: <a href="https://www.facebook.com/business/help/169845596919485" target="_blank" rel="noopener">Políticas para socios</a> · <a href="https://www.facebook.com/legal/creator_content_monetization_terms" target="_blank" rel="noopener">Términos de contenido</a> · <a href="https://creators.facebook.com/blog/combating-unoriginal-content" target="_blank" rel="noopener">Contenido no original</a> · <a href="https://about.fb.com/news/2026/03/rewarding-original-creators-on-facebook/" target="_blank" rel="noopener">Creadores originales (2026)</a>.</p>
         </div>
       </div>
     </div>

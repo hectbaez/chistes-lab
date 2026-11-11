@@ -143,3 +143,14 @@ body{overflow-wrap:break-word}
 .jokes li,.jokes li>div,.card,.col,.split>*,.panel{min-width:0}
 .jokes .txt,.jokes .meta{overflow-wrap:anywhere;word-break:break-word}
 textarea,.notes,.times span{overflow-wrap:anywhere}
+
+/* Validación de monetización */
+.pol{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.pol li{display:flex;gap:8px;font-size:.85rem;align-items:flex-start;line-height:1.35}
+.pol .ic2{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:.75rem;font-weight:700;border:1px solid currentColor}
+.pol li.bad{color:var(--bad)}.pol li.warn{color:var(--warn)}.pol li.ok{color:var(--ok)}.pol li.info{color:var(--muted)}
+.pol li strong{color:var(--fg)}.pol li span:not(.ic2){color:var(--muted)}
+#dlgMsg{white-space:pre-line}
+
+.bgbox{border:2px dashed var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.muted a{color:var(--accent)}
